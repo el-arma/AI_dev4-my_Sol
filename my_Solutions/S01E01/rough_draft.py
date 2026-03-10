@@ -106,17 +106,6 @@ print(LLM_resp)
 
 #%%
 
-from dotenv import load_dotenv
-import os
-
-load_dotenv()
-
-AI_DEV4_API_KEY = os.getenv("AI_DEV4_API_KEY")
-
-
-
-#%%
-
 json_LLM_resp = LLM_resp.model_dump()
 
 json_LLM_resp
