@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.env.*
+*.db
+.idea/
+.vscode/
+Technical_Notes/
+Technical_Notes
