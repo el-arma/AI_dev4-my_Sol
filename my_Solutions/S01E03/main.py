@@ -7,6 +7,7 @@ from schemas import QueryToAgent, AgentResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import Select
 from pydantic_ai.messages import ModelRequest, ModelResponse, UserPromptPart, TextPart
+from utlis import find_my_flag
 
 # Create tables
 Base.metadata.create_all(bind=engine)
@@ -54,14 +55,30 @@ def root() -> dict:
 def health_check() -> dict:
     return {"status": "ok"}
 
-# NOT SAFE, FOR DEV PURPOSES ONLY
-@app.get("/debug/db")
-def debug_db(db: Session = Depends(get_db)):
-    data = db.scalars(Select(ConversationHistory)).all()
+# # NOT SAFE, FOR DEV PURPOSES ONLY
+# @app.get("/debug/db")
+# def debug_db(db: Session = Depends(get_db)):
+#     data = db.scalars(Select(ConversationHistory)).all()
 
-    return {
-        "rows": [row.__dict__ for row in data]
-    }
+#     return {
+#         "rows": [row.__dict__ for row in data]
+#     }
+
+@app.get("/check-flag")
+def debug_db(db: Session = Depends(get_db)):
+    rows = db.scalars(Select(ConversationHistory)).all()
+
+    flag = None
+
+    for row in rows:
+        flag = find_my_flag(row.message)
+        if flag:
+            break
+
+    if not flag:
+        flag = "FLAG NOT FOUND!"
+
+    return flag
 
 @app.post("/api/v1/friendly-ear", response_model=AgentResponse)
 def ask_agent(request: QueryToAgent, db: Session = Depends(get_db)) -> AgentResponse:

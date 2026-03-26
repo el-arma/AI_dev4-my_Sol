@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - master
+    paths-ignore:
+      - 'README.md'
 
 # Global environment variables used across the workflow
 env:
@@ -19,10 +21,13 @@ env:
   # Base path for the Docker image in Artifact Registry
   # Format: REGION-docker.pkg.dev/PROJECT_ID/REPOSITORY/IMAGE
   IMAGE_BASE: europe-central2-docker.pkg.dev/project-86ba0137-6b38-4259-b08/my-apps-repo/ai-dev4s01e03-backend
-
+  # SECRETS:
   OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-
   AI_DEV4_API_KEY: ${{ secrets.AI_DEV4_API_KEY }}
+  # ENV Vars:
+  BASE_URL: ${{ vars.BASE_URL }}
+  VERIFICATION_ENDPOINT: ${{ vars.VERIFICATION_ENDPOINT }}
+  S01E03_PACKAGE_STATUS_URL: ${{ vars.S01E03_PACKAGE_STATUS_URL }}
 
 jobs:
   test:
@@ -90,12 +95,15 @@ jobs:
     - name: Push image
       run: docker push $IMAGE_BASE:$SHORT_SHA
 
-    # Deploy the container to Cloud Run:
     - name: Deploy
       run: |
         gcloud run deploy $SERVICE \
           --image $IMAGE_BASE:$SHORT_SHA \
-          --set-secrets AI_DEV4_API_KEY=ai-dev4-api-key:latest,OPENAI_API_KEY=openai-api-key:latest \
+          --set-env-vars BASE_URL=$BASE_URL \
+          --set-env-vars VERIFICATION_ENDPOINT=$VERIFICATION_ENDPOINT \
+          --set-env-vars S01E03_PACKAGE_STATUS_URL=$S01E03_PACKAGE_STATUS_URL \
+          --set-secrets OPENAI_API_KEY=openai-api-key:latest \
+          --set-secrets AI_DEV4_API_KEY=ai-dev4-api-key:latest \
           --region $REGION \
           --platform managed \
           --allow-unauthenticated

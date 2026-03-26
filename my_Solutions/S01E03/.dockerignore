@@ -8,4 +8,12 @@ __pycache__/
 .idea/
 .vscode/
 Technical_Notes/
-Technical_Notes
+ARCH/
+send_to_verify
+test_*.py
+*_test.py
+.pytest_cache/
+requirements-dev.txt
+.cache/
+S01E03_send_to_verify.py
+*.log

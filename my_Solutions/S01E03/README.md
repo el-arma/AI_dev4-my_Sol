@@ -1,3 +1,8 @@
+HOW TO RUN:
+1) Deploy with git push
+2) Sent signal that it's rdy (S01E03_send_to_verify.py)
+3) Check endpoint "check-flag" for flag
+
 **Stack:**
 FastAPI · SQLAlchemy · Pydantic · pytest · GitHub Actions · GCP Cloud Run · Docker · PydanticAI · uv
 
