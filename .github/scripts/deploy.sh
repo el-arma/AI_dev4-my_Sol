@@ -18,6 +18,7 @@ fi
 
 cd "$DEPLOY_DIR/$SPARSE_PATH"
 
+# docker-compose version 1.29.2
 docker-compose up -d --build
 
 echo "Deployment completed at $(date)"
