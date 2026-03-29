@@ -24,4 +24,4 @@ jobs:
           ssh-keyscan -H ${{ secrets.HETZNER_VPS_DEPLOY_HOST }} >> ~/.ssh/known_hosts
 
       - name: Deploy to VPS
-        run: ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.HETZNER_VPS_DEPLOY_HOST }} 'bash -s' < .github/scripts/deploy.sh
+        run: ssh -o StrictHostKeyChecking=no ${{ secrets.HETZNER_VPS_DEPLOY_USER }}@${{ secrets.HETZNER_VPS_DEPLOY_HOST }} 'bash -s' < .github/scripts/deploy.sh
