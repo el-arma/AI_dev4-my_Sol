@@ -24,14 +24,12 @@ jobs:
           ssh-keyscan -H ${{ secrets.HETZNER_VPS_DEPLOY_HOST }} >> ~/.ssh/known_hosts
 
       - name: Create .env on VPS
-        run: |
-          ssh ${{ secrets.HETZNER_VPS_DEPLOY_USER }}@${{ secrets.HETZNER_VPS_DEPLOY_HOST }} << EOF
-            mkdir -p \$HOME/deploy/build-app/templates/S0105_VPS-deploy-ai-agent/
-
-            echo "PYDANTIC_AI_GATEWAY_API_KEY=${{ secrets.PYDANTIC_AI_GATEWAY_API_KEY }}" > \$HOME/deploy/build-app/templates/S0105_VPS-deploy-ai-agent/.env
-            echo "LOGFIRE_TOKEN=${{ secrets.LOGFIRE_TOKEN }}" >> \$HOME/deploy/build-app/templates/S0105_VPS-deploy-ai-agent/.env
-
-          EOF
+              run: |
+                ssh ${{ secrets.HETZNER_VPS_DEPLOY_USER }}@${{ secrets.HETZNER_VPS_DEPLOY_HOST }} << EOF
+                  mkdir -p /deploy/build-app/templates/S01E05_VPS-deploy-ai-agent/
+                  echo "PYDANTIC_AI_GATEWAY_API_KEY=${{ secrets.PYDANTIC_AI_GATEWAY_API_KEY }}" > /deploy/build-app/templates/S01E05_VPS-deploy-ai-agent/.env
+                  echo "LOGFIRE_TOKEN=${{ secrets.LOGFIRE_TOKEN }}" >> /deploy/build-app/templates/S01E05_VPS-deploy-ai-agent/.env
+                EOF
 
       - name: Deploy to VPS
         run: ssh -o StrictHostKeyChecking=no ${{ secrets.HETZNER_VPS_DEPLOY_USER }}@${{ secrets.HETZNER_VPS_DEPLOY_HOST }} 'bash -s' < .github/scripts/deploy.sh

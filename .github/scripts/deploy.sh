@@ -3,7 +3,7 @@
 set -e
 
 REPO_URL="https://github.com/el-arma/AI_dev4-my_Sol.git"
-SPARSE_PATH="templates/S0105_VPS-deploy-ai-agent"
+SPARSE_PATH="templates/S01E05_VPS-deploy-ai-agent"
 DEPLOY_DIR="/deploy/build-app"
 
 if [ ! -d "$DEPLOY_DIR/.git" ]; then
