@@ -4,7 +4,7 @@ set -e
 
 REPO_URL="https://github.com/el-arma/AI_dev4-my_Sol.git"
 SPARSE_PATH="templates/S0105_VPS-deploy-ai-agent"
-DEPLOY_DIR="/opt/build-app"
+DEPLOY_DIR="/home/deploy/build-app"
 
 if [ ! -d "$DEPLOY_DIR/.git" ]; then
   git clone --filter=blob:none --sparse "$REPO_URL" "$DEPLOY_DIR"
