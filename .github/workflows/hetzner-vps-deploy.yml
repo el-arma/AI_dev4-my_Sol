@@ -1,0 +1,41 @@
+name: Hetzner Docker Deploy WF
+
+on:
+  push:
+    branches: master  # Trigger workflow on every push to "master" branch
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest  # Use a fresh Ubuntu VM provided by GitHub
+
+    steps:
+      - uses: actions/checkout@v4  # Clone the repository into the runner (optional here, but standard)
+
+      - name: Setup SSH
+        # Scope:
+        # Create .ssh directory if it doesn't exist
+        # Save private SSH key from GitHub Secrets to a file
+        # Set correct permissions (required by SSH)
+        # Add VPS host to known_hosts to avoid interactive prompt
+        run: |
+          mkdir -p ~/.ssh  
+          echo "${{ secrets.HETZNER_VPS_DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H ${{ secrets.HETZNER_VPS_DEPLOY_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to VPS
+        # Scope:
+        # Connect to VPS via SSH and execute commands
+        # Go to app directory on VPS
+        # Pull latest code from repo
+        # Stop and remove existing containers
+        # Rebuild and start containers in background
+        # Print deployment timestamp
+        run: |
+          ssh ${{ secrets.VPS_USER }}@${{ secrets.HETZNER_VPS_DEPLOY_HOST }} << 'EOF'
+            cd /opt/build-app  
+            git pull origin master
+            docker compose down
+            docker compose up -d --build
+            echo "Deployment completed at $(date)"
+          EOF
