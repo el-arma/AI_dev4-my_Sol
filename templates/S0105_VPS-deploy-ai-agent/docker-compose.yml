@@ -1,0 +1,14 @@
+version: "3.9"
+
+services:
+  app:
+    build: .
+    container_name: laszlo_conteiner
+    restart: always
+    env_file:
+      - .env
+    ports:
+      - "8000:8080"
+
+# To run:
+# docker-compose up -d --build

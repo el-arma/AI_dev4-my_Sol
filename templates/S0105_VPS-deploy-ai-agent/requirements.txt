@@ -1,0 +1,5 @@
+dotenv
+fastapi
+pydantic
+pydantic_ai
+uvicorn
