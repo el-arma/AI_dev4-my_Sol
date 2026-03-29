@@ -1,35 +1,35 @@
 name: Hetzner Docker Deploy WF
-
 on:
   push:
-    branches: master  # Trigger workflow on every push to "master" branch
-
+    branches: master
 jobs:
   deploy:
-    runs-on: ubuntu-latest  # Use a fresh Ubuntu VM provided by GitHub
-
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4  # Clone the repository into the runner (optional here, but standard)
-
+      - uses: actions/checkout@v4
       - name: Setup SSH
-        # Scope:
-        # Create .ssh directory if it doesn't exist
-        # Save private SSH key from GitHub Secrets to a file
-        # Set correct permissions (required by SSH)
-        # Add VPS host to known_hosts to avoid interactive prompt
         run: |
           mkdir -p ~/.ssh  
           echo "${{ secrets.HETZNER_VPS_DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H ${{ secrets.HETZNER_VPS_DEPLOY_HOST }} >> ~/.ssh/known_hosts
-
-      - name: Create .env on VPS
+      - name: Deploy to VPS
         run: |
           ssh ${{ secrets.HETZNER_VPS_DEPLOY_USER }}@${{ secrets.HETZNER_VPS_DEPLOY_HOST }} << EOF
-            mkdir -p /deploy/build-app/templates/S01E05_VPS-deploy-ai-agent/
+            if [ -d "/deploy/build-app" ] && [ ! -d "/deploy/build-app/.git" ]; then
+              rm -rf /deploy/build-app
+            fi
+            if [ ! -d "/deploy/build-app/.git" ]; then
+              git clone --filter=blob:none --sparse "https://github.com/el-arma/AI_dev4-my_Sol.git" /deploy/build-app
+              cd /deploy/build-app
+              git sparse-checkout set "templates/S01E05_VPS-deploy-ai-agent"
+            else
+              cd /deploy/build-app
+              git fetch origin
+              git reset --hard origin/master
+            fi
             echo "PYDANTIC_AI_GATEWAY_API_KEY=${{ secrets.PYDANTIC_AI_GATEWAY_API_KEY }}" > /deploy/build-app/templates/S01E05_VPS-deploy-ai-agent/.env
             echo "LOGFIRE_TOKEN=${{ secrets.LOGFIRE_TOKEN }}" >> /deploy/build-app/templates/S01E05_VPS-deploy-ai-agent/.env
+            cd /deploy/build-app/templates/S01E05_VPS-deploy-ai-agent
+            docker-compose up -d --build
           EOF
-
-      - name: Deploy to VPS
-        run: ssh -o StrictHostKeyChecking=no ${{ secrets.HETZNER_VPS_DEPLOY_USER }}@${{ secrets.HETZNER_VPS_DEPLOY_HOST }} 'bash -s' < .github/scripts/deploy.sh
