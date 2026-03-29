@@ -32,7 +32,7 @@ jobs:
         # Rebuild and start containers in background
         # Print deployment timestamp
         run: |
-          ssh ${{ secrets.VPS_USER }}@${{ secrets.HETZNER_VPS_DEPLOY_HOST }} << 'EOF'
+          ssh ${{ secrets.HETZNER_VPS_DEPLOY_USER }}@${{ secrets.HETZNER_VPS_DEPLOY_HOST }} << 'EOF'
             cd /opt/build-app  
             git pull origin master
             docker compose down
