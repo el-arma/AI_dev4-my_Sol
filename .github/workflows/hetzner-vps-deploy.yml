@@ -31,5 +31,5 @@ jobs:
             echo "PYDANTIC_AI_GATEWAY_API_KEY=${{ secrets.PYDANTIC_AI_GATEWAY_API_KEY }}" > /deploy/build-app/templates/S01E05_VPS-deploy-ai-agent/.env
             echo "LOGFIRE_TOKEN=${{ secrets.LOGFIRE_TOKEN }}" >> /deploy/build-app/templates/S01E05_VPS-deploy-ai-agent/.env
             cd /deploy/build-app/templates/S01E05_VPS-deploy-ai-agent
-            docker-compose up -d --build
+            docker-compose up -d --build --force-recreate
           EOF
