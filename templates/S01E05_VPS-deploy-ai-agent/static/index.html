@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Welcome</title>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0a0f29;
+      color: #e2e8f0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+    }
+
+    .container {
+      text-align: center;
+      max-width: 100%;
+      padding: 20px;
+    }
+
+    h1 {
+      font-size: 2.2rem;
+      margin-bottom: 10px;
+    }
+
+    p {
+      opacity: 0.8;
+      margin-bottom: 20px;
+    }
+
+    img {
+      height: 250px;
+      width: 600px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+    }
+
+    .status {
+      font-size: 0.9rem;
+      opacity: 0.6;
+    }
+
+    .dot {
+      height: 8px;
+      width: 8px;
+      background: #22c55e;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 6px;
+    }
+
+    a {
+      color: #38bdf8;
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <img src="my_ride.gif" alt="server gif" />
+
+    <h1>🚀 Welcome</h1>
+    <p>My VPS + FastAPI is up and running.</p>
+
+    <div class="status">
+      <span class="dot"></span> System healthy
+    </div>
+
+    <p style="margin-top:20px;">
+      <a href="/health">Check API health</a>
+    </p>
+
+    <p style="margin-top:20px;">
+      <a href="/ai-dev4">Check my progress</a>
+    </p>
+
+  </div>
+</body>
+</html>

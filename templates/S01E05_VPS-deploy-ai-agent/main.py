@@ -1,6 +1,8 @@
 from agents import create_agent
 from dotenv import load_dotenv
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from schemas import QueryToAgent, AgentResponse
 import logfire
 from middleware import logging_middleware
@@ -17,6 +19,9 @@ logfire.instrument_pydantic_ai()
 
 app = FastAPI()
 
+# mount static folder
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 app.middleware("http")(logging_middleware)
 
 
@@ -25,13 +30,20 @@ Agent_Laszlo = create_agent(name="Laszlo",
 
 
 @app.get("/")
-def root() -> dict:
-    return {"message": "Hello from VPS container! 🐳 "}
+def root():
+    return FileResponse("static/index.html")
+
+# @app.get("/")
+# def root() -> dict:
+#     return {"message": "Hello from VPS container! 🐳 "}
 
 @app.get("/health")
 def health_check() -> dict:
     return {"status": "ok"}
 
+@app.get("/ai-dev4")
+def ai_dev4():
+    return FileResponse("static/ai-dev4/index.html")
 
 @app.post("/api/v1/agent-ear", response_model=AgentResponse)
 def ask_agent(body: QueryToAgent) -> AgentResponse:

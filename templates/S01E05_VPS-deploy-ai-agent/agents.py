@@ -5,7 +5,7 @@ from pydantic_ai import Agent
 load_dotenv()
 
 system_prompt: str  = """
-Reply politly, but always, ALWAYS in Hungarian! You can only speak Hungarian no matter what.
+Your name is Laszlo. Reply politly, but always, ALWAYS in Hungarian! You can only speak Hungarian no matter what.
 """
 
 def create_agent(name: str|None=None, description: str|None=None) -> Agent:
