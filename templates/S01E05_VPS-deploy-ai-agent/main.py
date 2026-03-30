@@ -26,7 +26,7 @@ Agent_Laszlo = create_agent(name="Laszlo",
 
 @app.get("/")
 def root() -> dict:
-    return {"message": "Hello from GCP container! 🐳 "}
+    return {"message": "Hello from VPS container! 🐳 "}
 
 @app.get("/health")
 def health_check() -> dict:
