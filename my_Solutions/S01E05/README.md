@@ -31,7 +31,7 @@ Check my progress at:
 #### https://legiocybernetica.uk/ai-dev4
 
 Simple AI endpoint with AI on top (send request via POST):
-#### https://legiocybernetica.uk/ai-dev4/api/v1/agent-ear
+#### https://legiocybernetica.uk/api/v1/agent-ear
 
 ```json
 {
