@@ -1,0 +1,298 @@
+from dotenv import load_dotenv
+from functools import wraps
+import json
+import math
+import os
+import requests
+import random
+import pandas as pd
+from pathlib import Path
+from schemas import (TaskResultRequest,
+                    Input)
+import time
+from typing import Final, Any, List
+
+
+
+load_dotenv()
+
+AI_DEV4_API_KEY: Final[str] = os.environ["AI_DEV4_API_KEY"]
+BASE_URL: Final[str] = os.environ["BASE_URL"]
+
+PROJ_BASE_DIR: Final[Path] = Path(os.environ["PROJ_BASE_DIR"])
+DATA_BANK_PATH: Final[Path] = PROJ_BASE_DIR / "my_Solutions/Data_Bank"
+VERIFICATION_ENDPOINT = os.environ["VERIFICATION_ENDPOINT"]
+DEFAULT_VERIFY_URL: Final[str] = f"{BASE_URL}/{VERIFICATION_ENDPOINT}"
+
+def inject_api_key(func):
+    @wraps(func)
+    def wrapper(url: str, *args, **kwargs):
+
+        if "tutaj-twój-klucz" in url:
+            url = url.replace("tutaj-twój-klucz", AI_DEV4_API_KEY)
+
+        return func(url, *args, **kwargs)
+
+    return wrapper
+
+def save_to_json_file(
+    data: Any,
+    file_name: str,
+    *,
+    indent: int | None = 2,
+    ensure_ascii: bool = False
+) -> str | Path:
+    """
+    Save Python object to JSON file.
+
+    Args:
+        data: Any JSON-serializable Python object
+        file_name: file name with proper extension
+        indent: Pretty-print indentation (None for compact)
+        ensure_ascii: Escape non-ASCII characters if True
+        overwrite: Allow overwriting existing file
+
+    Returns:
+        Path to saved file
+    """
+    path = DATA_BANK_PATH / file_name
+
+    with path.open("w", encoding="utf-8") as f:
+        json.dump(
+            data,
+            f,
+            indent=indent,
+            ensure_ascii=ensure_ascii
+        )
+
+    return path
+
+
+@inject_api_key
+def fetch_json_data_from_URL(url: str) -> Any:
+    """
+    Fetch JSON data from a given URL.
+
+    Args:
+        url: Full URL to request.
+
+    Returns:
+        Parsed JSON response.
+    """
+
+    response = requests.get(url)
+    response.raise_for_status()
+
+    return response.json()
+
+def load_json_file(file_name: str | Path) -> Any:
+    """
+    Load JSON file from disk and return parsed Python object.
+    """
+
+    file_name = Path(file_name)
+
+    path = DATA_BANK_PATH / file_name
+
+    if not path.exists():
+        raise FileNotFoundError(f"JSON file not found: {path}")
+
+    with path.open("r", encoding="utf-8") as f:
+        return json.load(f)
+
+# def geo_distance_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+#     """
+#     Calculate approximate geographic distance between two coordinates.
+
+#     The function takes two points defined by latitude and longitude
+#     and returns the distance between them in kilometers (accuracy ~1 km).
+
+#     Args:
+#         lat1: latitude of the first point
+#         lon1: longitude of the first point
+#         lat2: latitude of the second point
+#         lon2: longitude of the second point
+
+#     Returns:
+#         Distance between the two points in kilometers
+#     """
+
+#     dlat = (lat2 - lat1) * 111
+#     dlon = (lon2 - lon1) * 111 * math.cos(math.radians(lat1))
+
+#     return math.sqrt(dlat**2 + dlon**2)
+
+# def geocode_place(place: str) -> dict | None:
+#     """
+#     Convert a place description into geographic coordinates using OpenStreetMap Nominatim.
+
+#     Args:
+#         place: Natural language description of a location (e.g. "power plant Tczew Poland").
+
+#     Returns:
+#         Dictionary with latitude and longitude or None if the place was not found.
+#         Example:
+#         {
+#             "lat": 54.0924,
+#             "lon": 18.7776
+#         }
+#     """
+
+#     url = "https://nominatim.openstreetmap.org/search"
+
+#     params = {
+#         "q": place,
+#         "format": "json",
+#         "limit": 1
+#     }
+
+#     headers = {
+#         "User-Agent": "ai-agent-geocoder"
+#     }
+
+#     response = requests.get(url, params=params, headers=headers, timeout=10)
+#     response.raise_for_status()
+
+#     data = response.json()
+
+#     if not data:
+#         return None
+
+#     return {
+#         "lat": float(data[0]["lat"]),
+#         "lon": float(data[0]["lon"])
+#     }
+
+def post_json_data_to_URL(url: str, payload: dict) -> Any:
+    """
+    Send JSON data via POST request and return JSON response.
+
+    Args:
+        url: Full URL to request.
+        payload: Data to send as JSON body.
+
+    Returns:
+        Parsed JSON response.
+    """
+
+    response = requests.post(url, json=payload)
+    # response.raise_for_status()
+
+    return response.json()
+
+def task_result_verification(task_name:str, answer: Any, apikey: str = AI_DEV4_API_KEY, 
+                     base_url: str = DEFAULT_VERIFY_URL)-> requests.Response:
+    """
+    Send task result to the Headquarter (also known as CENTRALA or HUB) API for verification.
+
+    Args:
+        task_name: name of the task (e.g. "findhim")
+        answer: task result (can be list, dict, string, etc., generaly some JSON object)
+
+    Returns:
+        API response parsed as JSON
+
+    """
+    payload = TaskResultRequest(
+        apikey=apikey,
+        task=task_name,
+        answer=answer
+    )
+
+    response = requests.post(
+        base_url,
+        json=payload.model_dump()
+    )
+
+    return response.json()
+
+def wait_for_API(retry_after: int = 15, penalty_seconds: int = 0) -> str:
+    """
+    Wait after receiving a rate limit error from the API.
+    Call this tool when you receive a response with "code": -985 (rate limit exceeded).
+    Pass the exact values from the error response.
+    
+    Args:
+        retry_after: seconds to wait, taken directly from the API error response field "retry_after"
+        penalty_seconds: additional penalty seconds from the API error response field "penalty_seconds"
+    
+    Returns:
+        Confirmation message that waiting is complete and the agent can retry.
+    """
+    wait = retry_after + penalty_seconds + random.uniform(1, 3)
+    print(f"⏳ Rate limit. Czekam {wait:.1f}s (retry_after={retry_after}, penalty={penalty_seconds})")
+    time.sleep(wait)
+    return f"Waited {wait:.1f} seconds. You can now retry the previous request."
+
+def fetch_csv_from_URL(task_name: str, apikey: str = AI_DEV4_API_KEY, 
+                    base_url: str = BASE_URL) -> Any:
+    """
+    Fetch CSV dataset from API called "CENTRALA" and return as pandas DataFrame. If url was not provided, 
+    Default URL will be used.
+
+    Args:
+        task_name: dataset name (e.g. "people")
+        base_url: base API url (e.g. "https://api.example.com")
+        api_key: AI_DEV4_API_KEY
+
+    Returns:
+        pandas DataFrame
+    """
+
+    url = f"{base_url}/data/{apikey}/{task_name}.csv"
+
+    df = pd.read_csv(url)
+
+    return df.to_json(orient="records")
+
+# def get_context():
+
+#     "Tool to remember the context beetwen AI Agents runs."
+
+#     # def inner():
+#     #     return context  
+
+#     context = [
+#     {
+#         "code": "i4283",
+#         "description": "Handful of fuses in glass tubes, rated between 1A and 30A"
+#     },
+#     {
+#         "code": "i1289",
+#         "description": "Pneumatic valve assembly with brass fittings and rubber seals"
+#     },
+#     {
+#         "code": "i2395",
+#         "description": "Large industrial fan blade assembly, three blades, aluminum construction"
+#     },
+#     {
+#         "code": "i6047",
+#         "description": "Reactor fuel cassette with experimental thorium-based fuel composition"
+#     },
+#     {
+#         "code": "i5546",
+#         "description": "Truck-sized leaf spring suspension assembly, heavily worn"
+#     },
+#     {
+#         "code": "i7391",
+#         "description": "Reactor fuel cassette containing enriched uranium pellets for portable nuclear power units"
+#     },
+#     {
+#         "code": "i8450",
+#         "description": "Collapsible baton made of hardened steel"
+#     },
+#     {
+#         "code": "i8095",
+#         "description": "Soldering iron with hand-carved wooden grip, surprisingly effective"
+#     },
+#     {
+#         "code": "i8461",
+#         "description": "Small CRT monitor gutted for parts but cathode tube still intact"
+#     },
+#     {
+#         "code": "i4668",
+#         "description": "Functional flamethrower with pressurized fuel canister and ignition system"
+#     }
+#     ]
+
+#     return get_context()
