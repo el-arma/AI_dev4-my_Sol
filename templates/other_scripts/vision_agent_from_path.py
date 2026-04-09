@@ -18,7 +18,7 @@ logfire.instrument_pydantic_ai()
 
 # ----------------------------------------------------------------------
 
-img_path = Path('my_Solutions/S02E02/IMG/SOLVED_STATE_SHREDS/B3.png')
+img_path = Path('OTHER_SCRIPTS-TESTs/A1.png')
 
 agent = Agent(model='gateway/google-vertex:gemini-2.5-flash-image')
 
