@@ -5,18 +5,18 @@ asyncio · GCP Cloud Run · Logfire · Pydantic · PydanticAI · uv · git · Gi
 
 **What’s new inside:**
 * logs improved
-* a primitive context session manager implemented (but it works!)
+* Implemented a primitive context session manager (but it works!)
 
-**LLM provides**
+**LLM providers**
 * Anthropic
 * Gemini (via GCP Vertex AI)
 * OpenAI
 
 **Task completion details:**
-* Task completed with: google-vertex:gemini-2.5-flash
+* Task completed using: google-vertex:gemini-2.5-flash
 
 **What I practiced / learned:**
-* Context passing
+* Context passing / handling
 
 **Side Quests:**
-* Set real MCP gmail server
+* Configured a real MCP Gmail server
