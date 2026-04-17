@@ -7,7 +7,8 @@ from pydantic_ai.models.openrouter import OpenRouterModel, OpenRouterModelSettin
 load_dotenv()
 
 agent = Agent(
-    OpenRouterModel('meta-llama/llama-3.3-70b-instruct:free'),
+    # OpenRouterModel('meta-llama/llama-3.3-70b-instruct:free'),
+    OpenRouterModel('openrouter/free'),
     model_settings=OpenRouterModelSettings(
         openrouter_provider={"allow_fallbacks": True}
     )
