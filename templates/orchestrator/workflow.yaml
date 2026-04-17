@@ -1,0 +1,59 @@
+# ──────────────────────────────────────────────────────────────
+# WORKFLOW MASTER PLAN
+# Defines every step: what it is, when it runs, how it runs.
+#
+# policy:
+#   always  →  runs on every invocation (e.g. fetching fresh data)
+#   once    →  runs only if NOT already marked DONE in the ledger
+#
+# mode:
+#   sequential  →  waits for the previous step to finish
+#   batch       →  runs concurrently with all steps sharing the same batch_id
+#
+# batch_id:
+#   only required when mode: batch — groups steps that run in parallel
+# ──────────────────────────────────────────────────────────────
+
+workflow:
+  name: Data Pipeline
+  ledger: ./ledger.json        # persistent checkpoint file
+
+steps:
+
+  - id: step_1
+    name: Fetch File
+    policy: always             # fresh file every run
+    mode: sequential
+    description: Download the latest data file from the remote source.
+
+  - id: step_2
+    name: Load Config
+    policy: once               # config doesn't change — do it once
+    mode: sequential
+    description: Read and validate the configuration file.
+
+  - id: step_3a
+    name: Process Chunk A
+    policy: always
+    mode: batch
+    batch_id: process          # runs concurrently with step_3b
+    description: Process the first half of the dataset.
+
+  - id: step_3b
+    name: Process Chunk B
+    policy: always
+    mode: batch
+    batch_id: process          # runs concurrently with step_3a
+    description: Process the second half of the dataset.
+
+  - id: step_4
+    name: Validate Results
+    policy: always
+    mode: sequential
+    description: Run integrity and quality checks on processed output.
+
+  - id: step_5
+    name: Upload Report
+    policy: once               # upload only happens once
+    mode: sequential
+    description: Push the final report to the destination bucket.

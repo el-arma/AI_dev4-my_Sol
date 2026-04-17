@@ -1,0 +1,16 @@
+{
+  "entries": {
+    "step_2": {
+      "status": "DONE",
+      "completed_at": "2026-04-10T22:36:42.674897+00:00",
+      "duration_ms": 62.04,
+      "error": null
+    },
+    "step_5": {
+      "status": "DONE",
+      "completed_at": "2026-04-10T22:36:43.065688+00:00",
+      "duration_ms": 110.35,
+      "error": null
+    }
+  }
+}
