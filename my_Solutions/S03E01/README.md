@@ -1,5 +1,5 @@
 **Stack:**
-asyncio · GCP Cloud Run · Pydantic Logfire · Pydantic · PydanticAI · uv · Git · GitHub · OpenRouter
+asyncio · GCP Cloud Run · Pydantic Logfire · Pydantic · PydanticAI · uv · Git · GitHub · OpenRouter · 
 Ollama · PostgreSQL 17 + (vector extension)
 
 **What’s new inside:**
@@ -24,11 +24,11 @@ Ollama · PostgreSQL 17 + (vector extension)
 **Side Quests:**
 * FORCED migration: PydanticAI Gateway → Pydantic Logfire [TODO]
 * "Simple" prompt caching [PROTOTYPE READY]
-* Evaluations: PydanticAI / Langfuse
+* Evaluations: PydanticAI / Langfuse 
 
 **Ideas:**
 * Deterministic plan executor/orchestrator
-  (user prepare a specific plan → break it into steps in YAML → run deterministically, what steps AI Agents should do, handling selected tasks; some run once, some every run, some async)[PROTOTYPE READY]
+  (user prepares a specific plan → break it into steps in YAML → run deterministically, what steps AI Agents should do, handling selected tasks; some run once, some every run, some async)[PROTOTYPE READY]
 * Automatic task summary
   (tokens usage: input/output, models used, time)
 * Automatic reasoning summary (how the task was completed)
