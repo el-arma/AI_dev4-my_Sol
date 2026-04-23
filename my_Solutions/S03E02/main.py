@@ -29,8 +29,10 @@ from suit import (
                 # get_from_context,
                 # get_content_from_Website,
                 # read_txt
+                HIL
                 )
 from utils import short_hash
+from token_tracker import CostTracker
 from typing import Final
 
 # ======================================================================
@@ -46,7 +48,7 @@ load_dotenv()
 S03E01_SENSORS_DATA: Final[str] = os.environ["S03E01_SENSORS_DATA"]
 
 # ======================================================================
-# LOGFIRE SETUP
+# LOGFIRE SETUP & Tracking
 # ======================================================================
 
 # Configure Logfire:
@@ -56,6 +58,8 @@ logfire.configure(
 
 logfire.instrument_pydantic_ai()
 logfire.instrument_httpx(capture_all=True)
+
+tt = CostTracker()
 
 # ======================================================================
 # MCP TOOLSET
@@ -76,7 +80,7 @@ ToolBox1 = [
             task_result_verification,
             # get_png_from_url,
             # get_from_context, save_to_context,
-            post_json_data_to_API
+            HIL(post_json_data_to_API)
             ]
 
 # ToolBox2 = [save_to_context]
@@ -98,10 +102,18 @@ system_prompt: str = "Check avialiable tools, use it if needed."
 
 sys_prompt = sys_prompt_S03E02
 
+task_models = {
+    "A":"google-gla:gemini-2.5-flash",
+    "B":"google-gla:gemini-2.5-flash",
+    "C":"openai:gpt-4o",
+    "Smith":"anthropic:claude-sonnet-4-6",
+}
+
 Agent_Smith = Agent(
     model="anthropic:claude-sonnet-4-6",
     system_prompt=sys_prompt,
     name="Agent Smith, specialty: Special Agent", 
+    description="Heavy Duty Agent",
     tools=ToolBox1
 )
 
@@ -122,10 +134,12 @@ async def main(task_name: str):
     user_prompt1 = "Execute system prompt"
 
     res1 = await Agent_Smith.run(user_prompt1)
+    tt.sum_tokens(Agent_Smith.model, res1.usage())
 
     print(res1)
 
     logfire.info("WF FINISH!")
+    tt.summary()
 
 if __name__ == "__main__":
     

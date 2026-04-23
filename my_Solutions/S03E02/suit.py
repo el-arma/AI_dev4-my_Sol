@@ -14,7 +14,6 @@ from schemas import (TaskResultRequest,
 from session import ContextSessionManager
 import time
 from urllib.parse import urlparse
-from utils import hash_the_flag
 from typing import Final, Any, List, Optional, Iterator
 from zipfile import ZipFile
 
@@ -45,6 +44,13 @@ whitelisted_URL: List[str] = [
 ]
 
 # ==================================================================
+# Custom Exceptions
+# ==================================================================
+
+class UserHalt(Exception):
+    pass
+
+# ==================================================================
 # Session
 # ==================================================================
 
@@ -68,6 +74,10 @@ def _check_if_whitelisted(url: str) -> bool:
         for base in map(urlparse, whitelisted_URL)
     )
 
+# ==================================================================
+# Decorators
+# ==================================================================
+
 def inject_api_key(func):
     @wraps(func)
     def wrapper(url: str, *args, **kwargs):
@@ -77,6 +87,48 @@ def inject_api_key(func):
 
         return func(url, *args, **kwargs)
 
+    return wrapper
+
+def HIL(fn):
+
+    """Require human approval before a tool executes."""
+
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+
+        print("\n" + "=" * 60)
+        
+        print(f"  Tool : {fn.__name__}")
+        print(f"  Args : {json.dumps(kwargs, indent=2, default=str)}")
+        print("=" * 60)
+
+        while True:
+
+            answer = input("  Grant the Agent permission to run the tool: (y)es/(n)o or (s)top: ").strip().lower()
+            
+            if answer in ("y", "yes"):
+                
+                # move on
+                break
+
+            if answer in ("n", "no"):
+                
+                print("Action denied by user.")
+
+                alter_instr = input("Please provide an alternative instruction for the Agent: \n")
+
+                return alter_instr
+            
+            if answer in ("s", "stop"):
+
+                print("AI System halted.")
+
+                raise UserHalt()
+            
+            print("Please type only 'y' or 'n' or 's'.")
+
+        return fn(*args, **kwargs)
+    
     return wrapper
 
 # ==================================================================
@@ -237,26 +289,7 @@ def task_result_verification(task_name:str, answer: Any, apikey: str = AI_DEV4_A
         json=payload.model_dump()
     )
 
-    CENTRALA_json_reply = response.json()
-
-    if response.status_code == 200:
-        
-        if CENTRALA_json_reply["code"]==0:
-
-            CENTRALA_msg: str = CENTRALA_json_reply["message"]
-
-            if "FLG:" in CENTRALA_msg:
-
-                extracted_flag: str = CENTRALA_msg.split("{FLG:")[1].split("}")[0]
-
-                print(
-                    f"🎉 FLAG CAPTURED: {CENTRALA_msg} 🏆 🚩\n"
-                    f"task_name: {task_name}\n"
-                    f"Flag: {extracted_flag}\n"
-                    f"{hash_the_flag(CENTRALA_msg)}"
-                )
-
-    return CENTRALA_json_reply
+    return response.json()
 
 def wait_for_API(retry_after: int = 15, penalty_seconds: int = 0) -> str:
     """
