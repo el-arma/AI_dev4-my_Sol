@@ -1,0 +1,16 @@
+services:
+  app:
+    build: .
+    container_name: test_container
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - DB_PATH=/DB/main.db
+    ports:
+      - "8001:8080"
+    volumes:
+      - ./main.db:/DB/main.db
+
+# To run:
+# docker-compose up -d --build

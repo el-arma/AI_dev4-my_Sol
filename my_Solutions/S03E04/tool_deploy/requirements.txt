@@ -1,0 +1,5 @@
+fastapi
+uvicorn[standard]
+python-dotenv
+logfire[fastapi,httpx]
+pydantic-ai[anthropic]
