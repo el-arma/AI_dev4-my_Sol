@@ -40,8 +40,7 @@ API_ZMAIL_URL: Final[str] = f"{BASE_URL}/{MAIL}"
 # WHITELIST [IMPORTANT]:
 whitelisted_URL: List[str] = [
     BASE_URL,
-    "https://nominatim.openstreetmap.org",
-    "https://hub.ag3nts.org",
+    "https://nominatim.openstreetmap.org"
 ]
 
 # ==================================================================

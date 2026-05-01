@@ -14,7 +14,7 @@ asyncio · GCP Cloud Run · Logfire · Pydantic · PydanticAI · uv · git · Gi
 * Input tokens (IT): 21.7k
 * Output tokens (OT): 5.6k
 * Requests: 11
-* Completion Tast: 36.5s
+* Task Completion: 36.5s
 * Full Task Completion Cost: $0.16
 
 **Ideas**

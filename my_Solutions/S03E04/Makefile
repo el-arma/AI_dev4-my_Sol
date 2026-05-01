@@ -3,8 +3,12 @@
 # ============================================================
 # Steps:
 #   1. get-data      — download CSV files from the data source
-#   2. setup-db      — load CSVs into SQLite (replaces stock table)
+#   2. setup-db      — load CSVs into SQLite
 #   3. health-check  — validate DB schema, row count, and data integrity
+#   4. deploy-local  — build and start the container locally
+#   5. test-local    — run smoke tests against local container (localhost:8001)
+#   6. [MANUAL] scp tool_deploy to hetzner-prod
+#   7. [MANUAL] build container on hetzner-prod via docker-compose
 # ============================================================
 
 .PHONY: all get-data setup-db health-check deploy-local deploy-remote test-local
@@ -32,7 +36,7 @@ deploy-local:
 	@echo "MAKE STEP [4/5] deploy-local - building and starting container..."
 	docker compose -f tool_deploy/docker-compose.yml up -d --build
 
-# Step 5: Run smoke + domain tests against the local container (localhost:8001)
+# Step 5: Run smoke against the local container (localhost:8001)
 # give 3 sec for container to start running
 test-local:
 	@echo "MAKE STEP [5/5] test-local - waiting 3s for container to start..."
