@@ -2,7 +2,7 @@
 
 <img src="assets/aidevs4-logo.svg" alt="AI_devs 4" height="44" />
 
-# AI_devs 4 - Claude Agent Workspace
+# AI_devs 4
 
 **Practical AI engineering course - cohort April 2026**
 
