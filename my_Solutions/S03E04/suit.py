@@ -13,6 +13,7 @@ from schemas import (TaskResultRequest,
                     )
 from session import ContextSessionManager
 import time
+from utils import hash_the_flag
 from urllib.parse import urlparse
 from typing import Final, Any, List, Optional, Iterator
 from zipfile import ZipFile
@@ -266,8 +267,45 @@ def load_json_file(file_name: str | Path) -> Any:
 #         "lon": float(data[0]["lon"])
 #     }
 
-def task_result_verification(task_name:str, answer: Any, apikey: str = AI_DEV4_API_KEY, 
-                     base_url: str = DEFAULT_VERIFY_URL)-> requests.Response:
+def _save_flag_hash(task_name: str, flag_hash: str) -> None:
+    
+    try:
+        # Maps task_name → episode code used as key in flags_SHA256.json
+        with open(PROJ_BASE_DIR / "my_Solutions/FLAGS/tasks_episodes_map.json") as f:
+            task_episode_map = json.load(f)
+
+    except Exception as e:
+        print(f"Could not save flag hash (skipping): {e}")
+        return None
+
+    episode = task_episode_map.get(task_name, Path(__file__).parent.name.lower())
+
+    FLAGS_HASH_PATH: Final[Path] = PROJ_BASE_DIR / "my_Solutions/flags_hash/flags_SHA256.json"
+
+    try:
+        with FLAGS_HASH_PATH.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+
+    except Exception as e:
+        print(f"Could not save flag hash (skipping): {e}")
+        return None
+    
+    if not episode in data:
+
+        data[episode] = flag_hash
+
+        with FLAGS_HASH_PATH.open("w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+
+        print(f"Saved to flags_SHA256.json: {episode} -> {flag_hash}")
+
+    else:
+        print(f"Hash for {episode} already in flags_SHA256.json")
+
+    return None
+
+def task_result_verification(task_name:str, answer: Any, apikey: str = AI_DEV4_API_KEY,
+                     base_url: str = DEFAULT_VERIFY_URL) -> requests.Response:
     """
     Send task result to the Headquarter (also known as CENTRALA or HUB) API for verification.
 
@@ -289,7 +327,30 @@ def task_result_verification(task_name:str, answer: Any, apikey: str = AI_DEV4_A
         json=payload.model_dump()
     )
 
-    return response.json()
+    CENTRALA_json_reply = response.json()
+
+    if response.status_code == 200:
+        
+        if CENTRALA_json_reply["code"]==0:
+
+            CENTRALA_msg: str = CENTRALA_json_reply["message"]
+
+            if "FLG:" in CENTRALA_msg:
+
+                extracted_flag: str = CENTRALA_msg.split("{FLG:")[1].split("}")[0]
+
+                flag_hash = hash_the_flag(extracted_flag)
+
+                print(
+                    f"🚩 FLAG CAPTURED: {CENTRALA_msg} 🚩\n"
+                    f"task_name: {task_name}\n"
+                    f"Flag: {extracted_flag}\n"
+                    f"{flag_hash}"
+                )
+
+                _save_flag_hash(task_name, flag_hash)
+
+    return CENTRALA_json_reply
 
 def wait_for_API(retry_after: int = 15, penalty_seconds: int = 0) -> str:
     """

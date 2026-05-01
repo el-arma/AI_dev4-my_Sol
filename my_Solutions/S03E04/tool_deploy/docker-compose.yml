@@ -1,7 +1,7 @@
 services:
   app:
     build: .
-    container_name: test_container
+    container_name: S03E04_negotiation_tools
     restart: always
     env_file:
       - .env

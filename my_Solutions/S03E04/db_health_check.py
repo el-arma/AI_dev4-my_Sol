@@ -2,8 +2,8 @@ import sqlite3
 from pathlib import Path
 from typing import Final
 
-DB_PATH: Final[Path] = Path(__file__).resolve().parent / "tool_deploy/main.db"
 
+DB_PATH: Final[Path] = Path(__file__).parent / "tool_deploy/main.db"
 
 def check_db(db_path: Path = DB_PATH) -> None:
     if not db_path.exists():
@@ -26,13 +26,17 @@ def check_db(db_path: Path = DB_PATH) -> None:
 
     # Check columns
     cols = [row[1] for row in conn.execute("PRAGMA table_info(stock)").fetchall()]
+
     print(f"Columns: {cols}")
+
     for expected in ("item_name", "item_code", "city_name", "city_code"):
         assert expected in cols, f"FAIL: missing column '{expected}'"
 
     # Sample rows
     rows = conn.execute("SELECT * FROM stock LIMIT 5").fetchall()
+
     print("\nSample rows:")
+
     for row in rows:
         print(dict(row))
 
@@ -43,6 +47,7 @@ def check_db(db_path: Path = DB_PATH) -> None:
         GROUP BY item_code, city_code
         HAVING cnt > 1
     """).fetchall()
+    
     assert len(dupes) == 0, f"FAIL: {len(dupes)} duplicate (item_code, city_code) pairs found"
 
     conn.close()

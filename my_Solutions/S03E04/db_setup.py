@@ -9,9 +9,8 @@ load_dotenv()
 
 # Path:
 PROJ_BASE_DIR: Final[Path] = Path(os.environ["PROJ_BASE_DIR"])
-DATA_BANK_PATH: Final[Path] = PROJ_BASE_DIR / "my_Solutions/Data_Bank"
-
-DB_PATH: Final[Path] = Path(__file__).resolve().parent / "tool_deploy/main.db"
+DATA_BANK_PATH: Final[Path] = PROJ_BASE_DIR / "my_Solutions/Data_Bank/S03E04_data"
+DB_PATH: Final[Path] = Path(__file__).parent / "tool_deploy/main.db"
 
 def setup_db(db_path: Path = DB_PATH) -> sqlite3.Connection:
     items = pd.read_csv(DATA_BANK_PATH / "items.csv").rename(columns={"code": "item_code", "name": "item_name"})

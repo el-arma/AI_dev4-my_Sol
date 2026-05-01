@@ -9,6 +9,8 @@ PRICING: dict[str, tuple[float, float]] = {
     "claude-sonnet-4-6":  (3.00, 15.00),
     "claude-haiku-4-5":   (0.80,  4.00),
     "gpt-4o":             (2.50, 10.00),
+    "gpt-5.2":            (1.75, 14.00),
+    "gpt-5.4":            (2.50, 15.00),
 }
 
 
