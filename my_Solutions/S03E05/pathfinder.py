@@ -1,374 +1,205 @@
-"""
-Deterministic pathfinder for the Skolwin messenger mission (AIDEVS S03E05).
+import heapq
+from collections import defaultdict
 
-ALGORITHM: Breadth-First Search (BFS) over a resource-aware state space.
+# =========================
+# CONFIG (from your files)
+# =========================
 
-WHY BFS:
-    BFS processes states in order of steps taken, so the first path that
-    reaches the goal is guaranteed to have the minimum number of moves.
-    Fewer moves = less food consumed — food is the scarcest resource here
-    because walk costs 2.5/step and must be used to cross water.
-
-STATE = (row, col, mode, fuel_x10, food_x10)
-    - (row, col):   current grid position
-    - mode:         active travel mode ('rocket', 'car', 'horse', 'walk')
-    - fuel_x10:     remaining fuel x 10, stored as integer to avoid float
-                    comparison bugs (e.g. 0.1+0.2 ≠ 0.3 in IEEE-754)
-    - food_x10:     remaining food x 10, same reason
-
-PRUNING (Pareto dominance):
-    For each (row, col, mode) we maintain a Pareto front of (fuel, food)
-    pairs seen so far. A new state is skipped if any existing point has
-    BOTH >= fuel AND >= food — that prior state can reach everything the
-    new one can, with at least as many resources. This keeps the queue
-    small without sacrificing correctness.
-
-DISMOUNT:
-    The 'dismount' command is a free action (no resource cost) that
-    switches mode from any vehicle to 'walk' at the current position.
-    It can happen at most once per journey.
-
-VEHICLE SELECTION:
-    All four vehicles are tried as the starting choice. The result with
-    the fewest total commands is returned (shorter = fewer steps = less food).
-
-INPUT CONTRACT:
-    grid          list[list[str]]  — 10x10 terrain symbols, row-major
-    start         (row, col)       — position of the 'S' cell
-    goal          (row, col)       — position of the 'G' cell
-    initial_fuel  float            — starting fuel (e.g. 10.0)
-    initial_food  float            — starting food (e.g. 10.0)
-    terrain_cfg   dict             — passability/cost rules per terrain symbol
-    vehicle_cfg   dict             — fuel/food costs per vehicle
-
-OUTPUT:
-    list[str] ready to POST as 'answer' to /verify, e.g.:
-        ["rocket", "up", "right", "right", "dismount", "right"]
-    None — if no valid path exists within the resource budget.
-"""
-
-from collections import deque
-
-# ---------------------------------------------------------------------------
-# Default configuration
-# Pass custom dicts to solve() if the API returns different values.
-# ---------------------------------------------------------------------------
-
-# Per-terrain rules
-# 'passable': set of modes allowed to enter this cell
-# 'is_tree':  True → powered vehicles (car, rocket) pay +tree_extra_fuel_x10
-TERRAIN_CFG: dict = {
-    '.': {'passable': {'rocket', 'car', 'horse', 'walk'}, 'is_tree': False},
-    'T': {'passable': {'rocket', 'car', 'horse', 'walk'}, 'is_tree': True},
-    'W': {'passable': {'horse', 'walk'},                  'is_tree': False},
-    'R': {'passable': set(),                              'is_tree': False},
-    'S': {'passable': {'rocket', 'car', 'horse', 'walk'}, 'is_tree': False},
-    'G': {'passable': {'rocket', 'car', 'horse', 'walk'}, 'is_tree': False},
+BASE_COST = {
+    "rocket": {"fuel": 1.0, "food": 0.1},
+    "car":    {"fuel": 0.7, "food": 1.0},
+    "horse":  {"fuel": 0.0, "food": 1.6},
+    "walk":   {"fuel": 0.0, "food": 2.5},
 }
 
-# Per-vehicle costs, stored x10 (integers) to match internal arithmetic.
-# tree_extra_fuel_x10 is added when entering an 'is_tree' cell; only applies
-# to modes that actually burn fuel (car, rocket).
-VEHICLE_CFG: dict = {
-    'rocket': {'fuel_x10': 10, 'food_x10':  1, 'tree_extra_fuel_x10': 2},
-    'car':    {'fuel_x10':  7, 'food_x10': 10, 'tree_extra_fuel_x10': 2},
-    'horse':  {'fuel_x10':  0, 'food_x10': 16, 'tree_extra_fuel_x10': 0},
-    'walk':   {'fuel_x10':  0, 'food_x10': 25, 'tree_extra_fuel_x10': 0},
+INITIAL_FUEL = 10.0
+INITIAL_FOOD = 10.0
+
+DIRECTIONS = {
+    "up":    (0, -1),
+    "down":  (0, 1),
+    "left":  (-1, 0),
+    "right": (1, 0),
 }
 
-# Cardinal directions only — no diagonals allowed by the task rules.
-MOVES: dict = {
-    'up':    (-1,  0),
-    'down':  ( 1,  0),
-    'left':  ( 0, -1),
-    'right': ( 0,  1),
-}
+# =========================
+# HELPERS
+# =========================
 
+def in_bounds(x, y, cols, rows):
+    return 0 <= x < cols and 0 <= y < rows
 
-# ---------------------------------------------------------------------------
-# BFS for a single starting vehicle
-# ---------------------------------------------------------------------------
+def passable(tile, mode):
+    """Check terrain constraints"""
+    if tile == "R":
+        return False
+    if tile == "W" and mode in ["car", "rocket"]:
+        return False
+    return True
 
-def _bfs(
-    grid: list,
-    vehicle: str,
-    start: tuple,
-    goal: tuple,
-    fuel_x10: int,
-    food_x10: int,
-    terrain_cfg: dict,
-    vehicle_cfg: dict,
-) -> list | None:
+def compute_cost(mode, tile):
+    """Compute resource consumption for entering tile"""
+    fuel = BASE_COST[mode]["fuel"]
+    food = BASE_COST[mode]["food"]
+
+    # Tree penalty
+    if tile == "T" and mode in ["car", "rocket"]:
+        fuel += 0.2
+
+    return fuel, food
+
+def heuristic(x, y, goal):
+    """Admissible heuristic: minimal food consumption"""
+    gx, gy = goal
+    dist = abs(x - gx) + abs(y - gy)
+    return dist * 0.1  # rocket minimal food
+
+# =========================
+# PARETO PRUNING
+# =========================
+
+def is_dominated(state, visited):
     """
-    Run BFS from `start` to `goal` using `vehicle` as the initial mode.
-
-    Returns the list of move/dismount commands (without the leading vehicle
-    name), or None if the goal is unreachable within the resource budget.
+    Check if this state is dominated by an already seen one.
+    Dominated = same (x,y,mode) but worse fuel AND food.
     """
-    rows, cols = len(grid), len(grid[0])
-    sr, sc = start
-    gr, gc = goal
-
-    # ------------------------------------------------------------------
-    # parent[state] = (predecessor_state, command_that_produced_this_state)
-    # Serves double duty: visited-set check + path reconstruction.
-    # ------------------------------------------------------------------
-    init_state = (sr, sc, vehicle, fuel_x10, food_x10)
-    parent: dict = {init_state: (None, None)}
-    queue: deque = deque([init_state])
-
-    # ------------------------------------------------------------------
-    # Pareto front per (row, col, mode):
-    #   list of (fuel, food) pairs that are mutually non-dominated.
-    # A state is dominated if an existing point has >= fuel AND >= food.
-    # ------------------------------------------------------------------
-    pareto: dict = {}  # (row, col, mode) -> list[(fuel_x10, food_x10)]
-
-    def _dominated(key: tuple, fuel: int, food: int) -> bool:
-        """Return True if (fuel, food) is dominated by any point on the front."""
-        for f, fo in pareto.get(key, []):
-            if f >= fuel and fo >= food:
-                return True
+    key = (state["x"], state["y"], state["mode"])
+    if key not in visited:
         return False
 
-    def _update_pareto(key: tuple, fuel: int, food: int) -> None:
-        """Add (fuel, food) to the front, removing any point it dominates."""
-        pts = pareto.get(key, [])
-        # Drop all existing points that the new point strictly dominates
-        pts = [(f, fo) for f, fo in pts if not (fuel >= f and food >= fo)]
-        pts.append((fuel, food))
-        pareto[key] = pts
+    for (f, food) in visited[key]:
+        if f >= state["fuel"] and food >= state["food"]:
+            return True
 
-    # Seed the starting position
-    _update_pareto((sr, sc, vehicle), fuel_x10, food_x10)
+    return False
 
-    # ------------------------------------------------------------------
-    # Main BFS loop
-    # ------------------------------------------------------------------
-    while queue:
-        state = queue.popleft()
-        row, col, mode, fuel, food = state
+def add_state(state, visited):
+    """
+    Add state to Pareto frontier and remove dominated entries.
+    """
+    key = (state["x"], state["y"], state["mode"])
 
-        # Goal check — reconstruct path by walking parent pointers backward
-        if row == gr and col == gc:
-            cmds: list = []
-            cur = state
-            while parent[cur][0] is not None:
-                prev, cmd = parent[cur]
-                cmds.append(cmd)
-                cur = prev
-            cmds.reverse()
-            return cmds
+    new_list = []
+    for (f, food) in visited[key]:
+        # remove states dominated by new one
+        if not (state["fuel"] >= f and state["food"] >= food):
+            new_list.append((f, food))
 
-        # --------------------------------------------------------------
-        # Action A: move in one of the four cardinal directions
-        # --------------------------------------------------------------
-        for cmd, (dr, dc) in MOVES.items():
-            nr, nc = row + dr, col + dc
+    new_list.append((state["fuel"], state["food"]))
+    visited[key] = new_list
 
-            # Stay within grid bounds
-            if not (0 <= nr < rows and 0 <= nc < cols):
+# =========================
+# CORE SOLVER
+# =========================
+
+def solve(grid):
+    """
+    Returns:
+        ["vehicle", "move1", "move2", ...]
+    """
+
+    rows = len(grid)
+    cols = len(grid[0])
+
+    # find start & goal
+    start = None
+    goal = None
+
+    for y in range(rows):
+        for x in range(cols):
+            if grid[y][x] == "S":
+                start = (x, y)
+            elif grid[y][x] == "G":
+                goal = (x, y)
+
+    # priority queue: (priority, counter, state)
+    pq = []
+    counter = 0
+
+    visited = defaultdict(list)
+
+    # try all starting vehicles (deterministic)
+    for vehicle in ["rocket", "car", "horse"]:
+        state = {
+            "x": start[0],
+            "y": start[1],
+            "mode": vehicle,
+            "fuel": INITIAL_FUEL,
+            "food": INITIAL_FOOD,
+            "path": [vehicle],
+        }
+
+        h = heuristic(state["x"], state["y"], goal)
+        heapq.heappush(pq, (h, counter, state))
+        counter += 1
+
+    # Greedy Best-First Search
+    while pq:
+        _, _, state = heapq.heappop(pq)
+
+        x, y = state["x"], state["y"]
+
+        # GOAL
+        if (x, y) == goal:
+            return state["path"]
+
+        # pruning
+        if is_dominated(state, visited):
+            continue
+
+        add_state(state, visited)
+
+        # =====================
+        # 1. MOVEMENT
+        # =====================
+        for move, (dx, dy) in DIRECTIONS.items():
+            nx, ny = x + dx, y + dy
+
+            if not in_bounds(nx, ny, cols, rows):
                 continue
 
-            terrain = grid[nr][nc]
-            t = terrain_cfg[terrain]
+            tile = grid[ny][nx]
 
-            # Current mode must be allowed on this terrain type
-            if mode not in t['passable']:
+            if not passable(tile, state["mode"]):
                 continue
 
-            # Compute resource cost for this step
-            v = vehicle_cfg[mode]
-            fuel_cost = v['fuel_x10']
-            if t['is_tree']:
-                # Tree tile: powered vehicles burn extra fuel on entry
-                fuel_cost += v['tree_extra_fuel_x10']
-            food_cost = v['food_x10']
+            fuel_cost, food_cost = compute_cost(state["mode"], tile)
 
-            new_fuel = fuel - fuel_cost
-            new_food = food - food_cost
+            new_fuel = state["fuel"] - fuel_cost
+            new_food = state["food"] - food_cost
 
-            # Skip if this move would exhaust either resource
             if new_fuel < 0 or new_food < 0:
                 continue
 
-            new_state = (nr, nc, mode, new_fuel, new_food)
+            new_state = {
+                "x": nx,
+                "y": ny,
+                "mode": state["mode"],
+                "fuel": new_fuel,
+                "food": new_food,
+                "path": state["path"] + [move],
+            }
 
-            # Skip if this exact state was already discovered
-            if new_state in parent:
-                continue
+            h = heuristic(nx, ny, goal)
 
-            # Skip if a previously seen state at this (pos, mode) already
-            # has at least as many resources (Pareto dominance pruning)
-            pk = (nr, nc, mode)
-            if _dominated(pk, new_fuel, new_food):
-                continue
+            heapq.heappush(pq, (h, counter, new_state))
+            counter += 1
 
-            _update_pareto(pk, new_fuel, new_food)
-            parent[new_state] = (state, cmd)
-            queue.append(new_state)
+        # =====================
+        # 2. DISMOUNT
+        # =====================
+        if state["mode"] != "walk":
+            new_state = {
+                "x": x,
+                "y": y,
+                "mode": "walk",
+                "fuel": state["fuel"],
+                "food": state["food"],
+                "path": state["path"] + ["dismount"],
+            }
 
-        # --------------------------------------------------------------
-        # Action B: dismount — switch from current vehicle to walk.
-        # Free action: no fuel or food consumed, position unchanged.
-        # Only valid if not already walking.
-        # --------------------------------------------------------------
-        if mode != 'walk':
-            new_state = (row, col, 'walk', fuel, food)
-            if new_state not in parent:
-                pk = (row, col, 'walk')
-                if not _dominated(pk, fuel, food):
-                    _update_pareto(pk, fuel, food)
-                    parent[new_state] = (state, 'dismount')
-                    queue.append(new_state)
+            heapq.heappush(pq, (heuristic(x, y, goal), counter, new_state))
+            counter += 1
 
-    return None  # This vehicle has no valid path to goal
+    return None  # no solution
 
-
-# ---------------------------------------------------------------------------
-# Public API
-# ---------------------------------------------------------------------------
-
-def solve(
-    grid: list,
-    start: tuple,
-    goal: tuple,
-    initial_fuel: float = 10.0,
-    initial_food: float = 10.0,
-    terrain_cfg: dict = TERRAIN_CFG,
-    vehicle_cfg: dict = VEHICLE_CFG,
-) -> list | None:
-    """
-    Find the shortest valid route from start to goal.
-
-    Tries every vehicle in vehicle_cfg as the starting choice and returns
-    the command list with the fewest total elements (minimum moves = minimum
-    food consumed overall).
-
-    Args:
-        grid:         2D list of terrain symbol strings (row-major, 0-indexed).
-        start:        (row, col) of the 'S' tile.
-        goal:         (row, col) of the 'G' tile.
-        initial_fuel: Starting fuel budget (float, e.g. 10.0).
-        initial_food: Starting food budget (float, e.g. 10.0).
-        terrain_cfg:  Terrain passability/cost rules — override if API changes.
-        vehicle_cfg:  Vehicle cost stats — override if API returns new values.
-
-    Returns:
-        list[str] — e.g. ["rocket", "up", "right", "dismount", "right", "right"]
-        None      — if no path exists within the resource budget.
-    """
-    # Multiply by 10 and round to get exact integers, avoiding float drift
-    fuel_x10 = round(initial_fuel * 10)
-    food_x10 = round(initial_food * 10)
-
-    best: list | None = None
-
-    for vehicle in vehicle_cfg:
-        path = _bfs(
-            grid, vehicle, start, goal,
-            fuel_x10, food_x10,
-            terrain_cfg, vehicle_cfg,
-        )
-
-        if path is None:
-            continue
-
-        # Prepend the vehicle-selection command (first element of the answer)
-        full = [vehicle] + path
-
-        # Keep the shorter solution (fewer steps = less food consumed)
-        if best is None or len(full) < len(best):
-            best = full
-
-    return best
-
-
-def parse_grid(raw_grid: list) -> tuple:
-    """
-    Scan raw_grid for 'S' (start) and 'G' (goal) positions.
-
-    Args:
-        raw_grid: 2D list of terrain symbol strings as returned by /api/maps.
-
-    Returns:
-        (grid, start_pos, goal_pos) where positions are (row, col) tuples.
-
-    Raises:
-        ValueError if 'S' or 'G' is missing from the grid.
-    """
-    start = goal = None
-    for r, row in enumerate(raw_grid):
-        for c, cell in enumerate(row):
-            if cell == 'S':
-                start = (r, c)
-            elif cell == 'G':
-                goal = (r, c)
-
-    if start is None or goal is None:
-        raise ValueError("Grid must contain exactly one 'S' and one 'G' cell.")
-
-    return raw_grid, start, goal
-
-
-# ---------------------------------------------------------------------------
-# Sanity check — run directly to verify the Skolwin map produces a valid path
-# ---------------------------------------------------------------------------
-
-if __name__ == '__main__':
-    SKOLWIN = [
-        ['.', '.', '.', '.', '.', '.', '.', '.', 'W', 'W'],
-        ['.', '.', '.', '.', '.', '.', '.', 'W', 'W', '.'],
-        ['.', 'T', '.', '.', '.', '.', 'W', 'W', '.', '.'],
-        ['.', '.', '.', '.', '.', '.', 'W', '.', '.', '.'],
-        ['.', '.', 'T', '.', '.', '.', 'W', '.', 'G', '.'],
-        ['.', '.', '.', '.', 'R', '.', 'W', '.', '.', '.'],
-        ['.', '.', '.', 'R', 'R', '.', 'W', 'W', '.', '.'],
-        ['S', 'R', '.', '.', '.', '.', '.', 'W', '.', '.'],
-        ['.', '.', '.', '.', '.', '.', 'W', 'W', '.', '.'],
-        ['.', '.', '.', '.', '.', 'W', 'W', '.', '.', '.'],
-    ]
-
-    grid, start, goal = parse_grid(SKOLWIN)
-    result = solve(grid, start, goal, initial_fuel=10.0, initial_food=10.0)
-
-    if result is None:
-        print("ERROR: No valid path found.")
-    else:
-        vehicle = result[0]
-        moves = [c for c in result[1:] if c != 'dismount']
-        has_dismount = 'dismount' in result
-
-        # Compute actual resource usage to verify correctness
-        mode = vehicle
-        fuel = 10.0
-        food = 10.0
-        row, col = start
-        print(f"Start: {start}, Goal: {goal}")
-        print(f"Vehicle: {vehicle}, Dismount used: {has_dismount}")
-        for cmd in result[1:]:
-            if cmd == 'dismount':
-                mode = 'walk'
-                print(f"  dismount -> walk  | fuel={fuel:.1f} food={food:.1f}")
-                continue
-            dr, dc = MOVES[cmd]
-            row += dr
-            col += dc
-            terrain = SKOLWIN[row][col]
-            v = VEHICLE_CFG[mode]
-            t = TERRAIN_CFG[terrain]
-            fc = v['fuel_x10'] / 10
-            foc = v['food_x10'] / 10
-            if t['is_tree']:
-                fc += v['tree_extra_fuel_x10'] / 10
-            fuel -= fc
-            food -= foc
-            print(f"  {cmd:5s} -> ({row},{col}) [{terrain}] | fuel={fuel:.1f} food={food:.1f}")
-
-        print(f"\nFinal position: ({row},{col})  Goal: {goal}")
-        print(f"Remaining: fuel={fuel:.1f}  food={food:.1f}")
-        print(f"\nAnswer: {result}")
-        print(f"Total commands: {len(result)}  (vehicle + {len(result)-1} steps/actions)")
-        assert (row, col) == goal, "Did not reach goal!"
-        assert fuel >= 0 and food >= 0, "Resource overrun!"
-        print("\nOK — path is valid.")

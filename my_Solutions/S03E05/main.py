@@ -2,11 +2,11 @@ import asyncio
 from dotenv import load_dotenv
 from logger import log_agent_run
 import logfire
-# from mcp_server.mcp_calc_server import fastmcp_server
 import os
 import pandas as pd
 from pathlib import Path
-from prompts_lib import sys_prompt_S03E05_step1
+from pathfinder import solve as pathfinder_solve
+from prompts_lib import sys_prompt_S03E05_full
 from pydantic_ai import Agent, BinaryContent, ConcurrencyLimit
 from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.models.openrouter import OpenRouterModel, OpenRouterModelSettings
@@ -74,6 +74,22 @@ tt = CostTracker()
 # TOOLS
 # ======================================================================
 
+def run_pathfinder(grid: list) -> list | None:
+    """
+    Solve the optimal route on the given grid.
+
+    Args:
+        grid: 2D list of terrain characters, row-major (list of rows).
+              Each cell is one of: '.' empty, 'T' tree, 'W' water, 'R' rock,
+              'S' start position, 'G' goal position.
+              Example: [[".", "S", "T"], ["W", ".", "G"]]
+
+    Returns:
+        Answer list ready for submission, e.g. ["rocket", "up", "right", "dismount", "right"].
+        Returns None if no valid path exists within the resource budget.
+    """
+    return pathfinder_solve(grid)
+
 ToolBox1 = [
             # download_zip_from_URL,
             # extract_zip_file,
@@ -82,7 +98,8 @@ ToolBox1 = [
             # get_png_from_url,
             # get_from_context, save_to_context,
             post_json_data_to_API,
-            save_to_markdown_file
+            save_to_markdown_file,
+            run_pathfinder,
             ]
 
 # ToolBox2 = [save_to_context]
@@ -109,7 +126,7 @@ task_models = {
 
 Agent_Smith = Agent(
     model="anthropic:claude-sonnet-4-6",
-    system_prompt=sys_prompt_S03E05_step1,
+    system_prompt=sys_prompt_S03E05_full,
     name="Agent Smith, specialty: Special Agent",
     description="Heavy Duty Agent",
     tools=ToolBox1
@@ -123,17 +140,11 @@ async def main(task_name: str):
 
     logfire.info("WF Starts")
 
-    # ----------------------------------------------------------------------
+    logfire.info("Phase I — discover, solve, submit")
 
-    logfire.info("Phase I — data collection")
-
-    user_prompt1 = "Execute system prompt."
-
-    res1 = await Agent_Smith.run(user_prompt1)
+    res1 = await Agent_Smith.run("Execute system prompt.")
 
     tt.sum_tokens(Agent_Smith.model, res1.usage())
-
-    print(res1)
 
     logfire.info("WF FINISH!")
 

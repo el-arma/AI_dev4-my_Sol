@@ -8,129 +8,50 @@ load_dotenv()
 S03E05_TOOL_SEARCH: Final[str] = os.environ["S03E05_TOOL_SEARCH"]
 
 # ======================================================================
-# PHASE 1 — DATA COLLECTION
+# FULL PIPELINE (collect → solve → submit)
 # ======================================================================
 
-sys_prompt_S03E05_step1 = f"""
-You are a data-collection agent. Your ONLY job in this session is to gather ALL information
-needed to plan an optimal route for a messenger travelling to the city of Skolwin on a 10x10
-grid map. Do NOT plan the route yet. Do NOT submit any answer. Just collect and save data.
+sys_prompt_S03E05_full = f"""
+You are a route-planning agent. Find the optimal path for a messenger to reach Skolwin, then submit the answer.
 
-## Your two tools
-- post_json_data_to_API(payload, url)  — send a POST request and get a JSON response
-- save_to_markdown_file(content, file_name) — save a string to a local .md file
+## Tools you have
+- post_json_data_to_API(payload, url)          — POST and get JSON response
+- task_result_verification(task_name, answer)  — submit answer to centrala
+- run_pathfinder(grid)                         — solve optimal route; returns ["vehicle", "dir", ...]
+- save_to_markdown_file(content, file_name)    — save notes locally
 
-## Tool discovery — how it works
-All tools are discovered through the ToolSearch API:
-
+## Tool discovery
+All domain tools are found via ToolSearch:
   URL : {S03E05_TOOL_SEARCH}
   Body: {{"query": "<your question in English>"}}
 
-ToolSearch returns the 3 best-matching results per query.
-Because it returns only 3 results at a time, you MUST run multiple queries with
-different keywords to uncover all available tools.
+ToolSearch returns 3 best-matching results per query. All tools communicate in English only.
 
-IMPORTANT: all tools and ToolSearch communicate ONLY in English.
-Every discovered tool also accepts a "query" field and returns JSON.
+## Pipeline — execute in order
 
-## What you must collect
+### Step 1 — Discover tools
+Query ToolSearch with: "map terrain grid", "vehicles fuel consumption", "movement rules"
+Collect the endpoint URLs for the map, vehicles, and rules tools.
 
-### 1. Map
-Query ideas: "map", "terrain grid", "Skolwin map", "10x10 grid"
-Save as: map_raw.md
-Must contain:
-- The full 10x10 grid (all 100 cells)
-- Each cell's terrain type or symbol
-- The coordinate system used (e.g. col/row origin, axis direction)
-- The start position (messenger's spawn point)
-- The goal position (Skolwin or finish cell)
+### Step 2 — Fetch the map grid
+Call the map tool. Extract the grid as a 2D list: a list of rows, where each row is a list of single-character strings.
+Valid symbols: '.' empty, 'T' tree, 'W' water, 'R' rock, 'S' start, 'G' goal.
+Example format: [['.', '.', 'W'], ['S', 'T', 'G']]
 
-### 2. Map legend
-Query ideas: "legend", "map symbols", "terrain types meaning", "cell notation"
-Save as: map_legend.md
-Must contain:
-- What each symbol / terrain code means (river, tree, rock, road, etc.)
-- Which terrain types are impassable (block movement)
-- Which terrain types slow movement or have extra costs
+### Step 3 — Solve the route
+Call: run_pathfinder(grid)
+Pass the full 2D grid exactly as a list of lists.
+The function returns a list like ["rocket", "up", "right", "dismount", "right"].
 
-### 3. Available vehicles
-Query ideas: "vehicles", "transport options", "car truck bicycle", "fuel consumption speed"
-Save as: vehicles.md
-Must contain for EACH vehicle:
-- Vehicle name (exact string, as used in the answer array)
-- Fuel consumed per move (unit)
-- Food consumed per move (unit)
-- Any special rules (e.g. cannot cross river, max speed, etc.)
+### Step 4 — Submit
+Call: task_result_verification(task_name="savethem", answer=<result from run_pathfinder>)
+A flag {{FLG:...}} in the response means success.
+If rejected, re-fetch the grid and solve again.
 
-### 4. Movement rules
-Query ideas: "movement rules", "walk on foot", "terrain costs", "passable impassable"
-Save as: movement_rules.md
-Must contain:
-- Rules for moving on foot (fuel cost = 0? food cost per step?)
-- Whether diagonal moves are allowed (assume NO unless confirmed)
-- Any terrain-specific movement penalties or bonuses
-- Rules for switching between vehicle and foot mid-journey
-
-### 5. Resource budget
-Already known (no API call needed), but save as: resources.md
-- Food budget  : 10 units
-- Fuel budget  : 10 units
-- Note any additional constraints found during discovery
-
-## Toolsearch query plan — run ALL of these
-
-Execute each query below against ToolSearch. For each result that looks relevant,
-call that tool with an appropriate "query" to extract data, then save the response.
-
-Batch 1 — map data:
-  1. "map terrain Skolwin grid"
-  2. "10x10 map cells coordinates"
-  3. "start position destination goal"
-
-Batch 2 — vehicles:
-  4. "available vehicles list"
-  5. "vehicle fuel consumption per move"
-  6. "vehicle food consumption speed"
-
-Batch 3 — rules:
-  7. "movement rules terrain passable"
-  8. "walk on foot fuel food cost"
-  9. "impassable terrain obstacles"
-
-Batch 4 — legend / extras:
-  10. "map legend symbols key"
-  11. "terrain types description"
-  12. "notes restrictions limitations travel"
-
-If a query returns a tool you haven't queried yet, call that tool immediately
-before moving to the next batch item.
-
-## Saving instructions
-
-After every API call that returns useful data, call save_to_markdown_file immediately.
-Use these file names:
-- map_raw.md          ← raw map grid as returned by the API
-- map_legend.md       ← terrain symbol definitions
-- vehicles.md         ← all vehicle names + stats in a table
-- movement_rules.md   ← movement and terrain cost rules
-- resources.md        ← resource budget + any extra constraints
-- tools_discovered.md ← running list of every tool URL/endpoint found
-
-Format each saved file clearly with markdown headers so it is easy to read later.
-
-## Completion criteria
-
-You are done when ALL of the following are saved and non-empty:
-✓ map_raw.md          — full 10x10 grid with start & goal marked
-✓ map_legend.md       — every symbol explained
-✓ vehicles.md         — every vehicle with fuel & food cost per move
-✓ movement_rules.md   — foot movement cost, terrain rules
-✓ resources.md        — budget summary
-✓ tools_discovered.md — list of all found tool endpoints
-
-When all files are saved, output a short summary:
-"DATA COLLECTION COMPLETE — files saved: [list]"
-Then stop. Do not attempt route planning.
+## Rules
+- Never hardcode the grid — always fetch it fresh from the API.
+- If run_pathfinder returns None, the grid format is wrong — re-check and retry.
+- Query ToolSearch in English only.
 """
 
 # ======================================================================

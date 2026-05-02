@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from pathlib import Path
 from pydantic_ai.models import Model
 from pydantic_ai.usage import RunUsage
 
@@ -69,17 +70,30 @@ class CostTracker:
         header = f"{'Model':<{col_w}} {'Input tok':>12} {'Output tok':>12} {'Requests':>10} {'Cost (USD)':>12}"
         sep = "-" * (len(header) + 20)
 
-        print()
-        print("=== Cost Summary ===")
-        print(sep)
-        print(header)
-        print(sep)
-        for model, inp, out, req, cost in rows:
-            cost_str = f"${cost:.6f}" if cost == cost else "unknown"
-            print(f"{model:<{col_w}} {inp:>12,} {out:>12,} {req:>10,} {cost_str:>12}")
-        print(sep)
         total_inp = sum(r[1] for r in rows)
         total_out = sum(r[2] for r in rows)
         total_req = sum(r[3] for r in rows)
-        print(f"{'TOTAL':<{col_w}} {total_inp:>12,} {total_out:>12,} {total_req:>10,} ${total_cost:>11.6f}")
-        print()
+
+        lines = [
+            "",
+            "=== Cost Summary ===",
+            sep,
+            header,
+            sep,
+        ]
+        for model, inp, out, req, cost in rows:
+            cost_str = f"${cost:.6f}" if cost == cost else "unknown"
+            lines.append(f"{model:<{col_w}} {inp:>12,} {out:>12,} {req:>10,} {cost_str:>12}")
+        lines += [
+            sep,
+            f"{'TOTAL':<{col_w}} {total_inp:>12,} {total_out:>12,} {total_req:>10,} ${total_cost:>11.6f}",
+            "",
+        ]
+
+        text = "\n".join(lines)
+        print(text)
+
+        episode = Path(__file__).parent.name
+        logs_dir = Path(__file__).parent / "logs"
+        logs_dir.mkdir(exist_ok=True)
+        (logs_dir / f"{episode}_Tokens_Cost.txt").write_text(text, encoding="utf-8")
