@@ -8,7 +8,7 @@
 
 [![Course](https://img.shields.io/badge/Course-AI__devs%204-90EE90?style=for-the-badge)](https://www.aidevs.pl/)
 [![Language](https://img.shields.io/badge/Language-Python-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
-[![Status](https://img.shields.io/badge/Tasks-15%2F25-yellow?style=for-the-badge)]()
+[![Status](https://img.shields.io/badge/Tasks-16%2F25-yellow?style=for-the-badge)]()
 
 </div>
 
