@@ -25,7 +25,6 @@ async def sent_multi_async_requests(url: str, payloads: Any) -> Any:
 
     limits = httpx.Limits(max_connections=100, max_keepalive_connections=20)
 
-
     async with httpx.AsyncClient(limits=limits, timeout=30.0) as client:
         tasks = [
             send_request(client, url, payload)
